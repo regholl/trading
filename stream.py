@@ -75,7 +75,7 @@ class Stream:
             await self.stream_client.handle_message()
 
     async def handle_quotes(self, msg):
-        if self.queue.full():  # This won't happen if the queue doesn't have a max size
+        if self.queue.full():
             print('Handler queue is full. Awaiting to make room... Some messages might be dropped')
             await self.queue.get()
         await self.queue.put(msg)
@@ -86,10 +86,11 @@ class Stream:
             for message in msg['content']:
                 if "LAST_PRICE" in message:
                     key = message['key']
-                    if 'key' in message:
-                        del message['key']
-                    if 'delayed' in message:
-                        del message['delayed']
+                    message.pop('key', None)
+                    message.pop('delayed', None)
+                    message.pop('assetMainType', None)
+                    message.pop('assetSubType', None)
+                    message.pop('cusip', None)
                     try:
                         with Sender(DB_HOST, DB_PORT) as sender:
                             sender.row(
