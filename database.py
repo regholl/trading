@@ -57,22 +57,28 @@ class Database:
     def update_bars(self, ticker):
         last_minute = None
         while True:
-            bar = self.get_current_bar(ticker)
-            if bar == None:
-                continue
 
             if ticker not in self.bars or last_minute == None:
+                bar = self.get_current_bar(ticker)
+                if bar == None:
+                    continue
                 self.bars[ticker] = [bar]
                 last_minute = bar._time_start
 
             # elif self.bars[ticker][-1]._time_start < pd.Timestamp.now().floor('T'):
             elif last_minute < pd.Timestamp.now().floor('T'):
+                bar = self.get_current_bar(ticker)
+                if bar == None:
+                    continue
                 if len(self.bars[ticker]) >= self.BAR_SIZE:
                     self.bars[ticker].pop(0)
                 self.bars[ticker].append(bar)
                 last_minute = bar._time_start
 
             else:
+                bar = self.get_current_bar(ticker)
+                if bar == None:
+                    continue
                 self.bars[ticker][-1] = bar
             print(self.bars[ticker])
 
