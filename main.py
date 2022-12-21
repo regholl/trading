@@ -6,31 +6,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as dates
 
-import warnings
-import os
+from database import Database
 
-from dotenv import dotenv_values
+ticker_file = open('./tickers')
+tickers = [ticker.strip() for ticker in ticker_file.readlines()]
 
-config = {
-    **dotenv_values(),
-    **os.environ
-}
-warnings.filterwarnings('ignore')
+database = Database()
+for ticker in tickers:
+    df = pd.read_sql('select to_timezone(timestamp, \'-05:00\') timestamp,LAST_PRICE from {0}'.format(ticker), con=database.connection)
+    x = df.loc[:,"timestamp"].to_numpy()
+    y = df.loc[:,"LAST_PRICE"].to_numpy()
+    x = np.array(x, dtype='datetime64[ns]')
 
-engine = pg.connect(
-    "user='{0}' password='{1}' host='{2}' port='{3}'".format(
-        config['DB_USER'],
-        config['DB_PASSWORD'],
-        config['DB_HOST'],
-        config['DB_PORT']
-    )
-)
-df = pd.read_sql('select * from SPY', con=engine)
-
-x = df.loc[:,"timestamp"].to_numpy()
-y = df.loc[:,"LAST_PRICE"].to_numpy()
-x = np.array(x, dtype='datetime64[ns]')
-
-plt.plot(x, y)
-
-plt.show()
+    print(ticker)
+    plt.plot(x, y)
+    plt.show()

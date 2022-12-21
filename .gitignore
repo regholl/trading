@@ -1,3 +1,4 @@
 .ipynb_checkpoints
 .token
 tickers
+__pycache__
