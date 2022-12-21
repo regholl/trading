@@ -15,15 +15,17 @@ if __name__ == '__main__':
     database = Database()
 
     update_threads = []
+    tickers = ['SPY']
     for ticker in tickers:
         update_thread = Thread(target = database.update_bars, args=(ticker,))
         update_thread.start()
         update_threads.append(update_thread)
 
     # while True:
-        # if 'SPY' in database.bars:
-        #     print(database.calculate_sma('SPY', 1))
-        #     break
+    #     if 'SPY' in database.bars:
+    #         print(len(database.bars['SPY']))
+    #         print()
+            # print(database.calculate_sma('SPY', 1))
         # if 'SPY' in database.bars:
             # print(database.bars['SPY'])
     # for ticker in tickers:

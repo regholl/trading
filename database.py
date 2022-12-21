@@ -12,7 +12,7 @@ from dotenv import dotenv_values
 
 class Database:
 
-    BAR_SIZE = 128
+    BAR_SIZE = 32
     # store most recent bars in a queue structure
     bars = {}
 
@@ -53,11 +53,48 @@ class Database:
 
         return Bar(open_, close, high, low, time_start, time_end)
 
+    def get_bar(self, ticker, timestamp):
+        query = 'SELECT timestamp_floor(\'m\', \'{0}\') floor, dateadd(\'m\', 1, timestamp_floor(\'m\', \'{0}\')) ceil, to_timezone(timestamp, \'-05:00\') timestamp_est,LAST_PRICE \
+                FROM {1} \
+                WHERE to_timezone(timestamp, \'-05:00\') \
+                BETWEEN timestamp_floor(\'m\', \'{0}\') \
+                AND dateadd(\'m\', 1, timestamp_floor(\'m\', \'{0}\'))'.format(timestamp, ticker)
+        data = pd.read_sql(query, con=self.connection)
+
+        prices = data['LAST_PRICE']
+        if len(prices) == 0:
+            return None
+
+        open_ = prices.head(1).iloc[0]
+        close = prices.tail(1).iloc[0]
+        high = prices.max()
+        low = prices.min()
+
+        time_start = data['floor'].iloc[0]
+        time_end = data['ceil'].iloc[0]
+
+        return Bar(open_, close, high, low, time_start, time_end)
+
     # run as thread in background to have updated bars in memory
     def update_bars(self, ticker):
-        last_minute = None
-        while True:
+        # first fill up until current point
+        current_time = pd.Timestamp.now().floor('T')
+        time_diff = pd.Timedelta(self.BAR_SIZE - 1, 'm')
 
+        start_time = current_time - time_diff
+        while start_time <= current_time:
+            bar = self.get_bar(ticker, start_time)
+            if bar == None:
+                self.bars[ticker] = []
+                break
+            if ticker not in self.bars:
+                self.bars[ticker] = [bar]
+            else:
+                self.bars[ticker].append(bar)
+            start_time += pd.Timedelta(1, 'm')
+
+        last_minute = None if len(self.bars[ticker]) == 0 else self.bars[ticker][-1]._time_start
+        while True:
             if ticker not in self.bars or last_minute == None:
                 bar = self.get_current_bar(ticker)
                 if bar == None:
@@ -65,7 +102,6 @@ class Database:
                 self.bars[ticker] = [bar]
                 last_minute = bar._time_start
 
-            # elif self.bars[ticker][-1]._time_start < pd.Timestamp.now().floor('T'):
             elif last_minute < pd.Timestamp.now().floor('T'):
                 bar = self.get_current_bar(ticker)
                 if bar == None:
@@ -80,7 +116,6 @@ class Database:
                 if bar == None:
                     continue
                 self.bars[ticker][-1] = bar
-            print(self.bars[ticker])
 
     def calculate_sma(self, ticker, count):
         return np.average([float(bar) for bar in self.bars[ticker]])
