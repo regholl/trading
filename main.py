@@ -23,4 +23,6 @@ if __name__ == '__main__':
     # bar = database.get_current_bar('SPY')
     # print(bar)
     while True:
-        print(database.bars)
+        if len(database.bars['SPY']) == database.NUM_BARS:
+            print(database.bars['SPY'])
+            print(database.calculate_sma('SPY', 4))

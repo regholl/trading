@@ -12,7 +12,8 @@ from dotenv import dotenv_values
 
 class Database:
 
-    BAR_SIZE = 32
+    # max num of bars to store in memory
+    NUM_BARS = 32
 
     # store most recent bars in a dictionary of dataframes
     bars = {}
@@ -54,8 +55,6 @@ class Database:
 
         start_time = data['floor'].iloc[0]
 
-        # df = pd.DataFrame(columns=self.bars.columns)
-        # df.loc[start_time] = [open_, close, low, high]
         return [open_, close, low, high]
 
     def get_bar(self, ticker, timestamp):
@@ -69,7 +68,6 @@ class Database:
         prices = data['LAST_PRICE']
         if len(prices) == 0:
             return None
-            # return pd.DataFrame(columns=self.bars.columns)
 
         open_ = prices.head(1).iloc[0]
         close = prices.tail(1).iloc[0]
@@ -78,14 +76,12 @@ class Database:
 
         start_time = data['floor'].iloc[0]
 
-        # df = pd.DataFrame(columns=self.bars.columns)
-        # df.loc[start_time] = [open_, close, low, high]
         return [open_, close, low, high]
 
     # run as thread in background to have updated bars in memory
     def update_bars(self, ticker):
         current_time = pd.Timestamp.now().floor('T')
-        time_diff = pd.Timedelta(self.BAR_SIZE - 1, 'm')
+        time_diff = pd.Timedelta(self.NUM_BARS - 1, 'm')
         last_time = current_time - time_diff
 
         while True:
@@ -94,7 +90,7 @@ class Database:
                 bar = self.get_bar(ticker, last_time)
 
                 # if the queue is full, drop the first row through FIFO principal
-                if len(self.bars[ticker]) >= self.BAR_SIZE:
+                if len(self.bars[ticker]) >= self.NUM_BARS:
                     self.bars[ticker] = self.bars[ticker].iloc[1:, :]
 
                 self.bars[ticker].loc[last_time] = bar
@@ -104,7 +100,10 @@ class Database:
 
     def calculate_sma(self, ticker, count):
         closing_prices = self.bars[ticker]['close']
-        return np.average(closing_prices)
+        if len(closing_prices) < count:
+            return 0
+        else:
+            return np.average(closing_prices[-count:])
 
     def __str__(self):
         return 'Connection Status: {0}\nBars: {1}'.format(self.connection.status, self.bars)
