@@ -13,10 +13,11 @@ from dotenv import dotenv_values
 class Database:
 
     BAR_SIZE = 32
-    # store most recent bars in a queue structure
+
+    # store most recent bars in a dictionary of dataframes
     bars = {}
 
-    def __init__(self):
+    def __init__(self, tickers):
         config = {
             **dotenv_values(),
             **os.environ
@@ -32,8 +33,11 @@ class Database:
             )
         )
 
+        for ticker in tickers:
+            self.bars[ticker] = pd.DataFrame(columns=['open', 'close', 'low', 'high'])
+
     def get_current_bar(self, ticker):
-        query = 'SELECT timestamp_floor(\'m\', to_timezone(now(), \'-05:00\')) floor, dateadd(\'m\', 1, timestamp_floor(\'m\', to_timezone(now(), \'-05:00\'))) ceil, to_timezone(timestamp, \'-05:00\') timestamp_est,LAST_PRICE from {0} \
+        query = 'SELECT timestamp_floor(\'m\', to_timezone(now(), \'-05:00\')) floor, to_timezone(timestamp, \'-05:00\') timestamp_est,LAST_PRICE from {0} \
                 WHERE to_timezone(timestamp, \'-05:00\') \
                 BETWEEN timestamp_floor(\'m\', to_timezone(now(), \'-05:00\')) \
                 AND dateadd(\'m\', 1, timestamp_floor(\'m\', to_timezone(now(), \'-05:00\')))'.format(ticker)
@@ -45,16 +49,17 @@ class Database:
 
         open_ = prices.head(1).iloc[0]
         close = prices.tail(1).iloc[0]
-        high = prices.max()
         low = prices.min()
+        high = prices.max()
 
-        time_start = data['floor'].iloc[0]
-        time_end = data['ceil'].iloc[0]
+        start_time = data['floor'].iloc[0]
 
-        return Bar(open_, close, high, low, time_start, time_end)
+        # df = pd.DataFrame(columns=self.bars.columns)
+        # df.loc[start_time] = [open_, close, low, high]
+        return [open_, close, low, high]
 
     def get_bar(self, ticker, timestamp):
-        query = 'SELECT timestamp_floor(\'m\', \'{0}\') floor, dateadd(\'m\', 1, timestamp_floor(\'m\', \'{0}\')) ceil, to_timezone(timestamp, \'-05:00\') timestamp_est,LAST_PRICE \
+        query = 'SELECT timestamp_floor(\'m\', \'{0}\') floor, to_timezone(timestamp, \'-05:00\') timestamp_est,LAST_PRICE \
                 FROM {1} \
                 WHERE to_timezone(timestamp, \'-05:00\') \
                 BETWEEN timestamp_floor(\'m\', \'{0}\') \
@@ -64,61 +69,42 @@ class Database:
         prices = data['LAST_PRICE']
         if len(prices) == 0:
             return None
+            # return pd.DataFrame(columns=self.bars.columns)
 
         open_ = prices.head(1).iloc[0]
         close = prices.tail(1).iloc[0]
         high = prices.max()
         low = prices.min()
 
-        time_start = data['floor'].iloc[0]
-        time_end = data['ceil'].iloc[0]
+        start_time = data['floor'].iloc[0]
 
-        return Bar(open_, close, high, low, time_start, time_end)
+        # df = pd.DataFrame(columns=self.bars.columns)
+        # df.loc[start_time] = [open_, close, low, high]
+        return [open_, close, low, high]
 
     # run as thread in background to have updated bars in memory
     def update_bars(self, ticker):
-        # first fill up until current point
         current_time = pd.Timestamp.now().floor('T')
         time_diff = pd.Timedelta(self.BAR_SIZE - 1, 'm')
+        last_time = current_time - time_diff
 
-        start_time = current_time - time_diff
-        while start_time <= current_time:
-            bar = self.get_bar(ticker, start_time)
-            if bar == None:
-                self.bars[ticker] = []
-                break
-            if ticker not in self.bars:
-                self.bars[ticker] = [bar]
-            else:
-                self.bars[ticker].append(bar)
-            start_time += pd.Timedelta(1, 'm')
-
-        last_minute = None if len(self.bars[ticker]) == 0 else self.bars[ticker][-1]._time_start
         while True:
-            if ticker not in self.bars or last_minute == None:
-                bar = self.get_current_bar(ticker)
-                if bar == None:
-                    continue
-                self.bars[ticker] = [bar]
-                last_minute = bar._time_start
 
-            elif last_minute < pd.Timestamp.now().floor('T'):
-                bar = self.get_current_bar(ticker)
-                if bar == None:
-                    continue
+            while last_time < pd.Timestamp.now().floor('T'):
+                bar = self.get_bar(ticker, last_time)
+
+                # if the queue is full, drop the first row through FIFO principal
                 if len(self.bars[ticker]) >= self.BAR_SIZE:
-                    self.bars[ticker].pop(0)
-                self.bars[ticker].append(bar)
-                last_minute = bar._time_start
+                    self.bars[ticker] = self.bars[ticker].iloc[1:, :]
 
-            else:
-                bar = self.get_current_bar(ticker)
-                if bar == None:
-                    continue
-                self.bars[ticker][-1] = bar
+                self.bars[ticker].loc[last_time] = bar
+                last_time += pd.Timedelta(1, 'm')
+
+            self.bars[ticker].loc[last_time] = self.get_bar(ticker, last_time)
 
     def calculate_sma(self, ticker, count):
-        return np.average([float(bar) for bar in self.bars[ticker]])
+        closing_prices = self.bars[ticker]['close']
+        return np.average(closing_prices)
 
     def __str__(self):
         return 'Connection Status: {0}\nBars: {1}'.format(self.connection.status, self.bars)
