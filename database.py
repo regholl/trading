@@ -37,6 +37,13 @@ class Database:
         for ticker in tickers:
             self.bars[ticker] = pd.DataFrame(columns=['open', 'close', 'low', 'high'])
 
+    def get_current_price(self, ticker):
+        query = 'SELECT LAST_PRICE FROM SPY ORDER BY timestamp DESC LIMIT 1;'
+        data = pd.read_sql(query, con=self.connection)
+
+        price = data['LAST_PRICE']
+        return price.iloc[0]
+
     def get_current_bar(self, ticker):
         query = 'SELECT timestamp_floor(\'m\', to_timezone(now(), \'-05:00\')) floor, to_timezone(timestamp, \'-05:00\') timestamp_est,LAST_PRICE from {0} \
                 WHERE to_timezone(timestamp, \'-05:00\') \
@@ -104,6 +111,18 @@ class Database:
             return 0
         else:
             return np.average(closing_prices[-count:])
+
+    def calculate_ema(self, ticker, count):
+        current_time = self.bars[ticker].iloc[-1:].index
+        return self.calculate_ema_recursive(ticker, count, current_time)
+
+    def calculate_ema_recursive(self, ticker, count, timestamp):
+        if count == 0:
+            return 0
+        current_price = float(self.bars[ticker].loc[timestamp, 'close'])
+        k = 2.0 / (count + 1)
+        return (current_price * k) + \
+            ((1 - k) * self.calculate_ema_recursive(ticker, count - 1, timestamp - pd.Timedelta(1, 'm')))
 
     def __str__(self):
         return 'Connection Status: {0}\nBars: {1}'.format(self.connection.status, self.bars)

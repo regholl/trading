@@ -7,6 +7,7 @@ import matplotlib.dates as dates
 from database import Database
 
 from threading import Thread
+import time
 
 if __name__ == '__main__':
     ticker_file = open('./tickers')
@@ -22,7 +23,11 @@ if __name__ == '__main__':
 
     # bar = database.get_current_bar('SPY')
     # print(bar)
+    time.sleep(2)
     while True:
-        if len(database.bars['SPY']) == database.NUM_BARS:
-            print(database.bars['SPY'])
-            print(database.calculate_sma('SPY', 4))
+        # if len(database.bars['SPY']) == database.NUM_BARS:
+        #     print(database.bars['SPY'])
+        #     print(database.calculate_sma('SPY', 4))
+        print(database.calculate_sma('SPY', 4))
+        print(database.calculate_ema('SPY', 4))
+        print('-' * 70)
