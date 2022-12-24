@@ -16,20 +16,21 @@ if __name__ == '__main__':
 
     database = Database(tickers, 64)
 
-    update_threads = []
+    # update_threads = []
     tickers = ['AAPL']
-    for ticker in tickers:
-        update_thread = Thread(target = database.update_bars, args=(ticker,), daemon=True)
-        update_thread.start()
-        update_threads.append(update_thread)
+    # for ticker in tickers:
+    #     update_thread = Thread(target = database.update_bars, args=(ticker,), daemon=True)
+    #     update_thread.start()
+    #     update_threads.append(update_thread)
 
     def algo(ticker):
         while len(database.bars[ticker]) != database.NUM_BARS:
-            pass
+            database.update_bars(ticker)
+            print(database.bars[ticker])
 
         while True:
-            if len(database.bars[ticker]) == database.NUM_BARS:
-                print('{0}: {1}'.format(ticker, database.calculate_rsi(ticker)))
+            print(database.bars[ticker])
+            print('{0}: {1}'.format(ticker, database.calculate_rsi(ticker)))
 
     algo_threads = []
     for ticker in tickers:
