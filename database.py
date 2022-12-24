@@ -7,23 +7,26 @@ import numpy as np
 import warnings
 import os
 
+from threading import Lock
+
 from dotenv import dotenv_values
 
 
 class Database:
 
     # max num of bars to store in memory
-    NUM_BARS = 32
+    # NUM_BARS = 64
 
     # store most recent bars in a dictionary of dataframes
     bars = {}
 
-    def __init__(self, tickers):
+    def __init__(self, tickers, num_bars):
         config = {
             **dotenv_values(),
             **os.environ
         }
         warnings.filterwarnings('ignore')
+        self.NUM_BARS = num_bars
 
         self.connection = pg.connect(
             "user='{0}' password='{1}' host='{2}' port='{3}'".format(
@@ -33,9 +36,11 @@ class Database:
                 config['DB_PORT']
             )
         )
+        self.lock = Lock()
 
-        for ticker in tickers:
-            self.bars[ticker] = pd.DataFrame(columns=['open', 'close', 'low', 'high'])
+        with self.lock:
+            for ticker in tickers:
+                self.bars[ticker] = pd.DataFrame(columns=['open', 'close', 'low', 'high'])
 
     def get_current_price(self, ticker):
         query = 'SELECT LAST_PRICE FROM SPY ORDER BY timestamp DESC LIMIT 1;'
@@ -92,37 +97,97 @@ class Database:
         last_time = current_time - time_diff
 
         while True:
-
-            while last_time < pd.Timestamp.now().floor('T'):
-                bar = self.get_bar(ticker, last_time)
-
-                # if the queue is full, drop the first row through FIFO principal
-                if len(self.bars[ticker]) >= self.NUM_BARS:
+            with self.lock:
+                if len(self.bars[ticker]) > self.NUM_BARS:
                     self.bars[ticker] = self.bars[ticker].iloc[1:, :]
+                while last_time < pd.Timestamp.now().floor('T'):
+                    bar = self.get_bar(ticker, last_time)
 
-                self.bars[ticker].loc[last_time] = bar
-                last_time += pd.Timedelta(1, 'm')
+                    # if the queue is full, drop the first row through FIFO principal
+                    if len(self.bars[ticker]) >= self.NUM_BARS:
+                        self.bars[ticker] = self.bars[ticker].iloc[1:, :]
 
-            self.bars[ticker].loc[last_time] = self.get_bar(ticker, last_time)
+                    self.bars[ticker].loc[last_time] = bar
+                    last_time += pd.Timedelta(1, 'm')
+
+                self.bars[ticker].loc[last_time] = self.get_bar(ticker, last_time)
 
     def calculate_sma(self, ticker, count):
-        closing_prices = self.bars[ticker]['close']
+        with self.lock:
+            closing_prices = self.bars[ticker]['close']
         if len(closing_prices) < count:
             return 0
         else:
             return np.average(closing_prices[-count:])
 
-    def calculate_ema(self, ticker, count):
-        current_time = self.bars[ticker].iloc[-1:].index
-        return self.calculate_ema_recursive(ticker, count, current_time)
+    def calculate_ema(self, *args):
+        if len(args) == 2:
+            with self.lock:
+                current_time = self.bars[args[0]].iloc[-1:].index
+            return self.calculate_ema_recursive(args[0], args[1], current_time)
+        elif len(args) == 3:
+            return self.calculate_ema_recursive(args[0], args[1], args[2])
 
     def calculate_ema_recursive(self, ticker, count, timestamp):
         if count == 0:
             return 0
-        current_price = float(self.bars[ticker].loc[timestamp, 'close'])
+        with self.lock:
+            current_price = float(self.bars[ticker].loc[timestamp, 'close'])
         k = 2.0 / (count + 1)
         return (current_price * k) + \
             ((1 - k) * self.calculate_ema_recursive(ticker, count - 1, timestamp - pd.Timedelta(1, 'm')))
+
+    def calculate_macd(self, ticker):
+        with self.lock:
+            current_time = self.bars[ticker].iloc[-1:].index
+        return self.calculate_macd_at_timestamp(ticker, current_time)
+
+    def calculate_macd_signal_line(self, ticker):
+        with self.lock:
+            current_time = self.bars[ticker].iloc[-1:].index
+        return self.calculate_macd_signal_line_recursive(ticker, 9, current_time)
+
+    def calculate_macd_signal_line_recursive(self, ticker, count, timestamp):
+        if count == 0:
+            return 0
+        current_macd = self.calculate_macd_at_timestamp(ticker, timestamp)
+        k = 2.0 / (count + 1)
+        return (current_macd * k) + \
+            ((1 - k) * self.calculate_macd_signal_line_recursive(ticker, count - 1, timestamp - pd.Timedelta(1, 'm')))
+
+    def calculate_macd_at_timestamp(self, ticker, timestamp):
+        return self.calculate_ema(ticker, 12, timestamp) - self.calculate_ema(ticker, 26, timestamp)
+
+    def calculate_rsi(self, ticker, periods=14):
+        with self.lock:
+            diffs = self.bars[ticker].diff(1)['close'].iloc[self.NUM_BARS - periods:]
+        gains = diffs.clip(lower=0)
+        losses = diffs.clip(upper=0).abs()
+        avg_gain = gains.rolling(window=periods, min_periods=periods).mean()[:periods+1]
+        avg_loss = losses.rolling(window=periods, min_periods=periods).mean()[:periods+1]
+
+        for i, row in enumerate(avg_gain.iloc[periods+1:]):
+            avg_gain.iloc[i + periods + 1] =\
+                (avg_gain.iloc[i + periods] *
+                (periods - 1) +
+                gains.iloc[i + periods + 1])\
+                / periods
+
+        for i, row in enumerate(avg_loss.iloc[periods+1:]):
+            avg_loss.iloc[i + periods + 1] =\
+                (avg_loss.iloc[i + periods] *
+                (periods - 1) +
+                losses.iloc[i + periods + 1])\
+                / periods
+
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1.0 + rs))
+
+        try:
+            return rsi.iloc[periods - 1]
+        except:
+            # print(self.bars[ticker])
+            return None
 
     def __str__(self):
         return 'Connection Status: {0}\nBars: {1}'.format(self.connection.status, self.bars)
