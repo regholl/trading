@@ -13,10 +13,6 @@ from dotenv import dotenv_values
 
 
 class Database:
-
-    # max num of bars to store in memory
-    # NUM_BARS = 64
-
     # store most recent bars in a dictionary of dataframes
     bars = {}
 
@@ -37,9 +33,6 @@ class Database:
                 config['DB_PORT']
             )
         )
-        # self.lock = Lock()
-
-        # with self.lock:
         for ticker in tickers:
             self.bars[ticker] = pd.DataFrame(columns=['open', 'close', 'low', 'high'])
 
@@ -91,14 +84,12 @@ class Database:
 
         return [open_, close, low, high]
 
-    # run as thread in background to have updated bars in memory
+    # run repeatedly on each loop iteration to keep updated
     def update_bars(self, ticker):
         current_time = pd.Timestamp.now().floor('T')
         time_diff = pd.Timedelta(self.NUM_BARS - 1, 'm')
         last_time = current_time - time_diff
 
-        # while True:
-        #     with self.lock:
         if len(self.bars[ticker]) > self.NUM_BARS:
             self.bars[ticker] = self.bars[ticker].iloc[1:, :]
         while last_time < pd.Timestamp.now().floor('T')
@@ -114,7 +105,6 @@ class Database:
         self.bars[ticker].loc[last_time] = self.get_bar(ticker, last_time)
 
     def calculate_sma(self, ticker, count):
-        # with self.lock:
         closing_prices = self.bars[ticker]['close']
         if len(closing_prices) < count:
             return 0
@@ -123,7 +113,6 @@ class Database:
 
     def calculate_ema(self, *args):
         if len(args) == 2:
-            # with self.lock:
             current_time = self.bars[args[0]].iloc[-1:].index
             return self.calculate_ema_recursive(args[0], args[1], current_time)
         elif len(args) == 3:
@@ -132,19 +121,16 @@ class Database:
     def calculate_ema_recursive(self, ticker, count, timestamp):
         if count == 0:
             return 0
-        # with self.lock:
         current_price = float(self.bars[ticker].loc[timestamp, 'close'])
         k = 2.0 / (count + 1)
         return (current_price * k) + \
             ((1 - k) * self.calculate_ema_recursive(ticker, count - 1, timestamp - pd.Timedelta(1, 'm')))
 
     def calculate_macd(self, ticker):
-        # with self.lock:
         current_time = self.bars[ticker].iloc[-1:].index
         return self.calculate_macd_at_timestamp(ticker, current_time)
 
     def calculate_macd_signal_line(self, ticker):
-        # with self.lock:
         current_time = self.bars[ticker].iloc[-1:].index
         return self.calculate_macd_signal_line_recursive(ticker, 9, current_time)
 
@@ -160,7 +146,6 @@ class Database:
         return self.calculate_ema(ticker, 12, timestamp) - self.calculate_ema(ticker, 26, timestamp)
 
     def calculate_rsi(self, ticker, periods=14):
-        # with self.lock:
         diffs = self.bars[ticker].diff(1)['close'].iloc[self.NUM_BARS - periods:]
         gains = diffs.clip(lower=0)
         losses = diffs.clip(upper=0).abs()
@@ -187,7 +172,6 @@ class Database:
         try:
             return rsi.iloc[periods - 1]
         except:
-            # print(self.bars[ticker])
             return None
 
     def __str__(self):
