@@ -37,7 +37,7 @@ class Database:
             self.bars[ticker] = pd.DataFrame(columns=['open', 'close', 'low', 'high'])
 
     def get_current_price(self, ticker):
-        query = 'SELECT LAST_PRICE FROM SPY ORDER BY timestamp DESC LIMIT 1;'
+        query = 'SELECT LAST_PRICE FROM {0} ORDER BY timestamp DESC LIMIT 1;'.format(ticker)
         data = pd.read_sql(query, con=self.connection)
 
         price = data['LAST_PRICE']
@@ -59,7 +59,7 @@ class Database:
         low = prices.min()
         high = prices.max()
 
-        start_time = data['floor'].iloc[0]
+        # start_time = data['floor'].iloc[0]
 
         return [open_, close, low, high]
 
@@ -80,7 +80,7 @@ class Database:
         high = prices.max()
         low = prices.min()
 
-        start_time = data['floor'].iloc[0]
+        # start_time = data['floor'].iloc[0]
 
         return [open_, close, low, high]
 
@@ -92,7 +92,7 @@ class Database:
 
         if len(self.bars[ticker]) > self.NUM_BARS:
             self.bars[ticker] = self.bars[ticker].iloc[1:, :]
-        while last_time < pd.Timestamp.now().floor('T')
+        while last_time < pd.Timestamp.now().floor('T'):
             bar = self.get_bar(ticker, last_time)
 
             # if the queue is full, drop the first row through FIFO principal
@@ -103,6 +103,7 @@ class Database:
             last_time += pd.Timedelta(1, 'm')
 
         self.bars[ticker].loc[last_time] = self.get_bar(ticker, last_time)
+        self.bars[ticker] = self.bars[ticker].sort_index(axis=0)
 
     def calculate_sma(self, ticker, count):
         closing_prices = self.bars[ticker]['close']
