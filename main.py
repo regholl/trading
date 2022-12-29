@@ -39,7 +39,7 @@ if __name__ == '__main__':
                     while True:
                         current_price = database.get_current_price(ticker)
                         if current_price > (1.001 * buy_price) or current_price < (0.999 * buy_price):
-                            print('Sold {0} at {1} for a {2} of {3}'.format(ticker, current_price, 'profit' if current_price > buy_price else 'loss', math.abs(current_price - buy_price)))
+                            print('Sold {0} at {1} for a {2} of {3}'.format(ticker, current_price, 'profit' if current_price > buy_price else 'loss', abs(current_price - buy_price)))
                             break
 
     algo_threads = []
