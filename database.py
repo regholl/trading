@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import psycopg2 as pg
+from questdb.ingress import Sender, IngressError
 
 import pandas as pd
 import numpy as np
 
 import warnings
 import os
+import sys
 
 # from threading import Lock
 
@@ -24,6 +26,8 @@ class Database:
         warnings.filterwarnings('ignore')
 
         self.NUM_BARS = num_bars
+        self.DB_HOST = config["DB_HOST"]
+        self.DB_PORT = config["DB_INSERT_PORT"]
 
         self.connection = pg.connect(
             "user='{0}' password='{1}' host='{2}' port='{3}'".format(
@@ -172,8 +176,31 @@ class Database:
 
         try:
             return rsi.iloc[periods - 1]
-        except:
+        except Exception:
             return None
+
+    def reset_trades(self):
+        query = 'DROP TABLE IF EXISTS Trades;'
+        with self.connection.cursor() as cur:
+            cur.execute(query)
+
+        query = 'CREATE TABLE Trades(ticker string, profit float, time timestamp);'
+        with self.connection.cursor() as cur:
+            cur.execute(query)
+
+    def send_trade(self, ticker, profit):
+        try:
+            with Sender(self.DB_HOST, self.DB_PORT) as sender:
+                sender.row(
+                    'Trades',
+                    columns={
+                        'ticker': ticker,
+                        'profit': profit
+                    }
+                )
+                sender.flush()
+        except IngressError as e:
+            sys.stderr.write(f'Got error: {e}\n')
 
     def __str__(self):
         return 'Connection Status: {0}\nBars: {1}'.format(self.connection.status, self.bars)

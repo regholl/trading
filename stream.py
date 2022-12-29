@@ -1,10 +1,8 @@
 #!/usr/bin/python3
 import asyncio
-from datetime import datetime
 import sys
 
 from tda.auth import client_from_token_file
-from tda.client import Client
 from tda.streaming import StreamClient
 
 from questdb.ingress import Sender, IngressError
@@ -31,6 +29,7 @@ ticker_file.close()
 
 for ticker in ticker_lines:
     tickers.append(ticker.strip())
+
 
 class Stream:
     def __init__(self, api_key, account_id, queue_size=0,
@@ -67,7 +66,7 @@ class Stream:
             self.stream_client.LevelOneEquityFields.LAST_SIZE,
             self.stream_client.LevelOneEquityFields.MARK,
             self.stream_client.LevelOneEquityFields.TOTAL_VOLUME,
-            ])
+        ])
 
         asyncio.ensure_future(self.handle_queue())
 
