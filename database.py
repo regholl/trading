@@ -4,6 +4,7 @@ from questdb.ingress import Sender, IngressError
 
 import pandas as pd
 import pandas_ta as ta
+from pandas_ta.volatility import bbands
 import numpy as np
 
 import warnings
@@ -126,13 +127,13 @@ class Database:
 
     # run repeatedly on each loop iteration to keep updated
     def update_bars(self, ticker):
-        current_time = pd.Timestamp.now().floor('T')
+        current_time = pd.Timestamp.now().floor('T') - pd.Timedelta(3, 'd') - pd.Timedelta(2, 'h')
         time_diff = pd.Timedelta(self.NUM_BARS - 1, 'm')
         last_time = current_time - time_diff
 
         if len(self.bars[ticker]) > self.NUM_BARS:
             self.bars[ticker] = self.bars[ticker].iloc[1:, :]
-        while last_time < pd.Timestamp.now().floor('T')
+        while last_time < pd.Timestamp.now().floor('T') - pd.Timedelta(3, 'd') - pd.Timedelta(2, 'h'):
             bar = self.get_bar(ticker, last_time)
 
             # if the queue is full, drop the first row through FIFO principal
@@ -171,7 +172,7 @@ class Database:
     #     current_time = self.bars[ticker].iloc[-1:].index
     #     return self.calculate_macd_at_timestamp(ticker, current_time)
 
-    def calculate_macd(self, ticker):
+    def macd(self, ticker):
         return ta.momentum.macd(self.bars[ticker]['close'])['MACDh_12_26_9'].iloc[-1]
 
     def calculate_macd_signal_line(self, ticker):
@@ -218,8 +219,14 @@ class Database:
     #     except Exception:
     #         return None
 
-    def calculate_rsi(self, ticker, periods=14):
+    def rsi(self, ticker, periods=14):
         return ta.momentum.rsi(close=self.bars[ticker]['close'], length=periods).iloc[-1]
+
+    def bollinger_bands(self, ticker):
+        df = bbands(close=self.bars[ticker]['close'])
+        df['lower'] = -1
+        df['upper'] = 1000000
+        return df
 
     def reset_trades(self):
         query = 'DROP TABLE IF EXISTS Trades;'
