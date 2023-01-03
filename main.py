@@ -34,14 +34,14 @@ def uptrend(ticker, lower_bound=None, upper_bound=None):
     b_bands = database.bollinger_bands(ticker)
 
     # add logic for price levels given purchase history
-    while (database.get_current_price(ticker) > b_bands[lower_bound].iloc[-2]) and (database.get_current_price(ticker) < b_bands[upper_bound].iloc[-2]):
+    while (database.get_current_price(ticker) > b_bands[lower_bound].iloc[-1]) and (database.get_current_price(ticker) < b_bands[upper_bound].iloc[-1]):
         holding = True
         buy_price = database.get_current_price(ticker)
         num_shares = math.ceil(1000 / buy_price)
         buy_time = pd.Timestamp.now()
         print('Bought {0} shares of {1} at {2}'.format(num_shares, ticker, buy_price))
 
-        while (database.get_current_price(ticker) > b_bands[lower_bound].iloc[-2]) and (database.get_current_price(ticker) < b_bands[upper_bound].iloc[-2]):
+        while (database.get_current_price(ticker) > b_bands[lower_bound].iloc[-1]) and (database.get_current_price(ticker) < b_bands[upper_bound].iloc[-1]):
             current_price = database.get_current_price(ticker)
             if math.isnan(current_price):
                 continue
@@ -63,7 +63,7 @@ def uptrend(ticker, lower_bound=None, upper_bound=None):
         database.update_bars(ticker)
         b_bands = database.bollinger_bands(ticker)
 
-    exit_type = -1 if database.get_current_price(ticker) < b_bands[lower_bound].iloc[-2] else 1
+    exit_type = -1 if database.get_current_price(ticker) < b_bands[lower_bound].iloc[-1] else 1
 
     if holding:
         sell_price = database.get_current_price(ticker)
@@ -85,7 +85,7 @@ def uptrend(ticker, lower_bound=None, upper_bound=None):
 
 def downtrend(ticker):
     print('Starting downtrend on {0}'.format(ticker))
-    while database.get_current_price(ticker) < database.bollinger_bands(ticker)[bounds['lower']].iloc[-2]:
+    while database.get_current_price(ticker) < database.bollinger_bands(ticker)[bounds['lower']].iloc[-1]:
         database.update_bars(ticker)
 
     if database.rsi(ticker) < 40:
@@ -108,8 +108,8 @@ def algo(ticker):
         database.update_bars(ticker)
 
         b_bands = database.bollinger_bands(ticker)
-        lower = b_bands[bounds['lower']].iloc[-2]
-        upper = b_bands[bounds['upper']].iloc[-2]
+        lower = b_bands[bounds['lower']].iloc[-1]
+        upper = b_bands[bounds['upper']].iloc[-1]
 
         # if database.get_current_price(ticker) > upper:
         #     uptrend(ticker, lower_bound='upper')

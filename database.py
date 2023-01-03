@@ -205,7 +205,7 @@ class Database:
         return ta.momentum.rsi(close=self.bars[ticker]['close'], length=periods).iloc[-1]
 
     def bollinger_bands(self, ticker):
-        df = bbands(close=self.bars[ticker]['close'], length=20)
+        df = bbands(close=self.bars[ticker]['close'], length=20, offset=1)
         df['lower'] = -1
         df['upper'] = sys.maxsize
         return df
