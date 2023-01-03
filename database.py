@@ -11,8 +11,6 @@ import warnings
 import os
 import sys
 
-# from threading import Lock
-
 from dotenv import dotenv_values
 
 
@@ -46,23 +44,7 @@ class Database:
             self.bars[ticker] = pd.DataFrame(columns=['open', 'close', 'low', 'high'])
 
     def get_current_price(self, ticker):
-        try:
-            query = 'SELECT LAST_PRICE FROM {0} ORDER BY timestamp DESC LIMIT 1;'.format(ticker)
-            data = pd.read_sql(query, con=self.connection)
-        except Exception:
-            print('Connection lost. Reconnecting...')
-            self.connection = pg.connect(
-                "user='{0}' password='{1}' host='{2}' port='{3}'".format(
-                    self.DB_USER,
-                    self.DB_PASSWORD,
-                    self.DB_HOST,
-                    self.DB_PORT
-                )
-            )
-            return self.get_current_price(ticker)
-
-        price = data['LAST_PRICE']
-        return price.iloc[0]
+        return self.bars[ticker]['close'].iloc[-1]
 
     def get_current_bar(self, ticker):
         try:
@@ -127,13 +109,13 @@ class Database:
 
     # run repeatedly on each loop iteration to keep updated
     def update_bars(self, ticker):
-        current_time = pd.Timestamp.now().floor('T') - pd.Timedelta(3, 'd') - pd.Timedelta(2, 'h')
+        current_time = pd.Timestamp.now().floor('T') - pd.Timedelta(3, 'd') - pd.Timedelta(6, 'h') - pd.Timedelta(37, 'm')
         time_diff = pd.Timedelta(self.NUM_BARS - 1, 'm')
         last_time = current_time - time_diff
 
         if len(self.bars[ticker]) > self.NUM_BARS:
             self.bars[ticker] = self.bars[ticker].iloc[1:, :]
-        while last_time < pd.Timestamp.now().floor('T') - pd.Timedelta(3, 'd') - pd.Timedelta(2, 'h'):
+        while last_time < pd.Timestamp.now().floor('T') - pd.Timedelta(3, 'd') - pd.Timedelta(6, 'h') - pd.Timedelta(37, 'm'):
             bar = self.get_bar(ticker, last_time)
 
             # if the queue is full, drop the first row through FIFO principal
@@ -225,7 +207,7 @@ class Database:
     def bollinger_bands(self, ticker):
         df = bbands(close=self.bars[ticker]['close'])
         df['lower'] = -1
-        df['upper'] = 1000000
+        df['upper'] = sys.maxsize
         return df
 
     def reset_trades(self):
