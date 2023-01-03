@@ -109,13 +109,13 @@ class Database:
 
     # run repeatedly on each loop iteration to keep updated
     def update_bars(self, ticker):
-        current_time = pd.Timestamp.now().floor('T') - pd.Timedelta(3, 'd') - pd.Timedelta(6, 'h') - pd.Timedelta(37, 'm')
+        current_time = pd.Timestamp.now().floor('T')
         time_diff = pd.Timedelta(self.NUM_BARS - 1, 'm')
         last_time = current_time - time_diff
 
         if len(self.bars[ticker]) > self.NUM_BARS:
             self.bars[ticker] = self.bars[ticker].iloc[1:, :]
-        while last_time < pd.Timestamp.now().floor('T') - pd.Timedelta(3, 'd') - pd.Timedelta(6, 'h') - pd.Timedelta(37, 'm'):
+        while last_time < pd.Timestamp.now().floor('T'):
             bar = self.get_bar(ticker, last_time)
 
             # if the queue is full, drop the first row through FIFO principal
@@ -205,7 +205,7 @@ class Database:
         return ta.momentum.rsi(close=self.bars[ticker]['close'], length=periods).iloc[-1]
 
     def bollinger_bands(self, ticker):
-        df = bbands(close=self.bars[ticker]['close'])
+        df = bbands(close=self.bars[ticker]['close'], length=20)
         df['lower'] = -1
         df['upper'] = sys.maxsize
         return df
@@ -215,18 +215,29 @@ class Database:
         with self.connection.cursor() as cur:
             cur.execute(query)
 
-        query = 'CREATE TABLE Trades(ticker string, profit float, time timestamp) timestamp(time);'
+        query = 'CREATE TABLE Trades(ticker string, profit float, buy_price float, sell_price float, buy_time timestamp, sell_time timestamp);'
         with self.connection.cursor() as cur:
             cur.execute(query)
 
-    def send_trade(self, ticker, profit):
+    def get_trades(self, ticker):
+        query = 'SELECT * \
+                FROM Trades \
+                WHERE ticker=\'{0}\''.format(ticker)
+        data = pd.read_sql(query, con=self.connection)
+        return data
+
+    def send_trade(self, ticker, profit, buy_price, sell_price, buy_time, sell_time):
         try:
             with Sender(self.DB_HOST, self.DB_INSERT_PORT) as sender:
                 sender.row(
                     'Trades',
                     columns={
                         'ticker': ticker,
-                        'profit': profit
+                        'profit': profit,
+                        'buy_price': buy_price,
+                        'sell_price': sell_price,
+                        'buy_time': buy_time,
+                        'sell_time': sell_time
                     }
                 )
                 sender.flush()

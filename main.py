@@ -3,20 +3,21 @@ from database import Database
 
 from threading import Thread
 import math
+import pandas as pd
 
 
 ticker_file = open('./tickers')
 tickers = [ticker.strip() for ticker in ticker_file.readlines()]
 
-tickers = ['AAPL']
+# tickers = ['AAPL']
 
 database = Database(tickers, 64)
 database.reset_trades()
 
 bounds = {
-    'lower': 'BBL_5_2.0',
-    'mid': 'BBM_5_2.0',
-    'upper': 'BBU_5_2.0'
+    'lower': 'BBL_20_2.0',
+    'mid': 'BBM_20_2.0',
+    'upper': 'BBU_20_2.0'
 }
 
 
@@ -37,18 +38,22 @@ def uptrend(ticker, lower_bound=None, upper_bound=None):
         holding = True
         buy_price = database.get_current_price(ticker)
         num_shares = math.ceil(1000 / buy_price)
+        buy_time = pd.Timestamp.now()
         print('Bought {0} shares of {1} at {2}'.format(num_shares, ticker, buy_price))
 
         while (database.get_current_price(ticker) > b_bands[lower_bound].iloc[-2]) and (database.get_current_price(ticker) < b_bands[upper_bound].iloc[-2]):
             current_price = database.get_current_price(ticker)
+            if math.isnan(current_price):
+                continue
             if current_price > (1.001 * buy_price) or current_price < (0.999 * buy_price):
+                sell_time = pd.Timestamp.now()
                 print('Sold {0} shares of {1} at {2} for a {3} of {4}'.format(
                     num_shares,
                     ticker,
                     current_price,
                     'profit' if current_price > buy_price else 'loss',
                     abs(current_price - buy_price) * num_shares))
-                database.send_trade(ticker, (current_price - buy_price) * num_shares)
+                database.send_trade(ticker, (current_price - buy_price) * num_shares, buy_price, current_price, buy_time, sell_time)
 
                 holding = False
                 break
@@ -62,6 +67,9 @@ def uptrend(ticker, lower_bound=None, upper_bound=None):
 
     if holding:
         sell_price = database.get_current_price(ticker)
+        sell_time = pd.Timestamp.now()
+        while math.isnan(sell_price) or sell_price is None:
+            sell_price = database.get_current_price(ticker)
         print('Sold {0} shares of {1} at {2} for a total {3} of {4}'.format(
             num_shares,
             ticker,
@@ -69,7 +77,7 @@ def uptrend(ticker, lower_bound=None, upper_bound=None):
             'profit' if sell_price > buy_price else 'loss',
             abs(sell_price - buy_price) * num_shares))
 
-        database.send_trade(ticker, (sell_price - buy_price) * num_shares)
+        database.send_trade(ticker, (sell_price - buy_price) * num_shares, buy_price, sell_price, buy_time, sell_time)
         holding = False
 
     return exit_type
@@ -94,7 +102,7 @@ def algo(ticker):
         database.update_bars(ticker)
 
     print('Finished initialization for {0}'.format(ticker))
-    print(database.bars[ticker])
+    # print(database.bars[ticker])
 
     while True:
         database.update_bars(ticker)
@@ -103,9 +111,9 @@ def algo(ticker):
         lower = b_bands[bounds['lower']].iloc[-2]
         upper = b_bands[bounds['upper']].iloc[-2]
 
-        if database.get_current_price(ticker) > upper:
-            uptrend(ticker, lower_bound='upper')
-        elif database.get_current_price(ticker) < lower:
+        # if database.get_current_price(ticker) > upper:
+        #     uptrend(ticker, lower_bound='upper')
+        if database.get_current_price(ticker) < lower:
             downtrend(ticker)
 
 
