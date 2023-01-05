@@ -3,11 +3,11 @@ import plotly.graph_objects as go
 
 from database import Database
 
-stock = 'AMD'
+stock = 'AAPL'
 
 tickers = [stock]
 ticker = stock
-database = Database(tickers, 64)
+database = Database(tickers, 256)
 
 while len(database.bars[ticker]) != database.NUM_BARS:
     database.update_bars(ticker)
@@ -34,6 +34,3 @@ for index, row in trades.iterrows():
 
 fig.update_layout(xaxis_rangeslider_visible=False)
 fig.show()
-
-while True:
-    fig.update_layout(title_text="Hello")

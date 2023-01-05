@@ -40,6 +40,8 @@ class Database:
                 self.DB_PORT
             )
         )
+
+        self.previous_time = None
         for ticker in tickers:
             self.bars[ticker] = pd.DataFrame(columns=['open', 'close', 'low', 'high'])
 
@@ -111,7 +113,7 @@ class Database:
     def update_bars(self, ticker):
         current_time = pd.Timestamp.now().floor('T')
         time_diff = pd.Timedelta(self.NUM_BARS - 1, 'm')
-        last_time = current_time - time_diff
+        last_time = current_time - time_diff if self.previous_time is None else self.previous_time
 
         if len(self.bars[ticker]) > self.NUM_BARS:
             self.bars[ticker] = self.bars[ticker].iloc[1:, :]
@@ -127,6 +129,7 @@ class Database:
 
         self.bars[ticker].loc[last_time] = self.get_bar(ticker, last_time)
         self.bars[ticker] = self.bars[ticker].sort_index(axis=0)
+        self.previous_time = last_time
 
     def calculate_sma(self, ticker, count):
         closing_prices = self.bars[ticker]['close']
@@ -215,7 +218,7 @@ class Database:
         with self.connection.cursor() as cur:
             cur.execute(query)
 
-        query = 'CREATE TABLE Trades(ticker string, profit float, buy_price float, sell_price float, buy_time timestamp, sell_time timestamp);'
+        query = 'CREATE TABLE Trades(ticker string, profit float, buy_price float, sell_price float, min_rsi float, buy_time timestamp, sell_time timestamp);'
         with self.connection.cursor() as cur:
             cur.execute(query)
 
@@ -226,7 +229,7 @@ class Database:
         data = pd.read_sql(query, con=self.connection)
         return data
 
-    def send_trade(self, ticker, profit, buy_price, sell_price, buy_time, sell_time):
+    def send_trade(self, ticker, profit, buy_price, sell_price, min_rsi, buy_time, sell_time):
         try:
             with Sender(self.DB_HOST, self.DB_INSERT_PORT) as sender:
                 sender.row(
@@ -236,6 +239,7 @@ class Database:
                         'profit': profit,
                         'buy_price': buy_price,
                         'sell_price': sell_price,
+                        'min_rsi': min_rsi,
                         'buy_time': buy_time,
                         'sell_time': sell_time
                     }
