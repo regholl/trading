@@ -10,6 +10,7 @@ import numpy as np
 import warnings
 import os
 import sys
+import math
 
 from dotenv import dotenv_values
 
@@ -46,6 +47,8 @@ class Database:
             self.bars[ticker] = pd.DataFrame(columns=['open', 'close', 'low', 'high'])
 
     def get_current_price(self, ticker):
+        while math.isnan(self.bars[ticker]['close'].iloc[-1]):
+            self.update_bars(ticker)
         return self.bars[ticker]['close'].iloc[-1]
 
     def get_current_bar(self, ticker):
@@ -161,7 +164,7 @@ class Database:
         return ta.momentum.macd(self.bars[ticker]['close'])['MACDh_12_26_9'].iloc[-1]
 
     def calculate_macd_signal_line(self, ticker):
-        current_time = self.bars[ticker].iloc[-1:].index
+        current_time = self.bars[ticker].index[-1]
         return self.calculate_macd_signal_line_recursive(ticker, 9, current_time)
 
     def calculate_macd_signal_line_recursive(self, ticker, count, timestamp):

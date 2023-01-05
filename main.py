@@ -92,7 +92,7 @@ def uptrend(ticker, min_rsi):
     database.update_bars(ticker)
 
     buy_price = database.get_current_price(ticker)
-    num_shares = math.ceil(1000 / buy_price)
+    num_shares = math.ceil(1000.0 / buy_price)
     buy_time = pd.Timestamp.now()
     print('Bought {0} shares of {1} at {2}'.format(num_shares, ticker, buy_price))
 
@@ -109,14 +109,19 @@ def uptrend(ticker, min_rsi):
 
     current_price = database.get_current_price(ticker)
     b_bands = database.bollinger_bands(ticker)
+    max_close = current_price
 
-    while (prev_bar_1m_close > prev_bar_1m_open) or (prev_bar_2m_close > prev_bar_2m_open) or (buy_price - max_risk < current_price) or (current_price < b_bands[bounds['upper']]):
+    # TODO: adjust entry and closing parameters
+    # 1. adjust entry to trigger when within range of closing above lower band, not exactly above
+    # 2. change metric for closing to follow trend fully, increase loss % required to close
+    while ((prev_bar_1m_close > prev_bar_1m_open) or (prev_bar_2m_close > prev_bar_2m_open)) and (max_close - max_risk < current_price) and (current_price < b_bands[bounds['upper']].iloc[-1]):
         database.update_bars(ticker)
         prev_bar_1m_open = database.bars[ticker]['open'].iloc[-1]
         prev_bar_1m_close = database.bars[ticker]['close'].iloc[-1]
         prev_bar_2m_open = database.bars[ticker]['open'].iloc[-2]
         prev_bar_2m_close = database.bars[ticker]['close'].iloc[-2]
         current_price = database.get_current_price(ticker)
+        max_close = max(max_close, prev_bar_1m_close)
         b_bands = database.bollinger_bands(ticker)
 
     sell_time = pd.Timestamp.now()
@@ -139,8 +144,8 @@ def downtrend(ticker):
     previous_open = database.bars[ticker]['open'].iloc[-2]
     previous_close = database.bars[ticker]['close'].iloc[-2]
     min_rsi = database.rsi(ticker)
-    start_time = database.bars[ticker].iloc[-1].index
-    while (previous_open > previous_close) or (previous_close < database.bollinger_bands(ticker)[bounds['lower']].iloc[-1]) or (database.bars[ticker].iloc[-1].index == start_time):
+    start_time = database.bars[ticker].index[-1]
+    while (previous_open > previous_close) or (previous_close < database.bollinger_bands(ticker)[bounds['lower']].iloc[-1]) or (database.bars[ticker].index[-1] == start_time):
         database.update_bars(ticker)
         previous_open = database.bars[ticker]['open'].iloc[-2]
         previous_close = database.bars[ticker]['close'].iloc[-2]
@@ -149,13 +154,6 @@ def downtrend(ticker):
     print('Crossed lower band for {0} with min rsi of {1}'.format(ticker, min_rsi))
     if min_rsi < 40:
         uptrend(ticker, min_rsi)
-        # uptrend with middle as upper limit and low as lower limit
-        # TODO: Add logic for if uptrend starts but never reaches midpoint and starts dropping
-        # crossed = False if uptrend(ticker, 'lower', 'mid') < 0 else True
-
-        # start an uptrend that lasts until crossing upper band or dipping below middle band
-        # if crossed:
-            # uptrend(ticker, 'mid', 'upper')
 
 
 def algo(ticker):
@@ -164,17 +162,13 @@ def algo(ticker):
         database.update_bars(ticker)
 
     print('Finished initialization for {0}'.format(ticker))
-    print(database.bars[ticker])
 
     while True:
         database.update_bars(ticker)
 
         b_bands = database.bollinger_bands(ticker)
         lower = b_bands[bounds['lower']].iloc[-1]
-        # upper = b_bands[bounds['upper']].iloc[-1]
 
-        # if database.get_current_price(ticker) > upper:
-        #     uptrend(ticker, lower_bound='upper')
         if database.get_current_price(ticker) < lower:
             downtrend(ticker)
 

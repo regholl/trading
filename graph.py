@@ -7,7 +7,7 @@ stock = 'AAPL'
 
 tickers = [stock]
 ticker = stock
-database = Database(tickers, 256)
+database = Database(tickers, 64)
 
 while len(database.bars[ticker]) != database.NUM_BARS:
     database.update_bars(ticker)
