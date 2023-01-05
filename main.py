@@ -20,6 +20,8 @@ bounds = {
     'upper': 'BBU_20_2.0'
 }
 
+max_cost = 2500.00
+
 
 # change algo to hold for longer periods of time instead of using scalping strategy
 def uptrend_old(ticker, lower_bound=None, upper_bound=None):
@@ -38,7 +40,7 @@ def uptrend_old(ticker, lower_bound=None, upper_bound=None):
     while (database.get_current_price(ticker) > b_bands[lower_bound].iloc[-1]) and (database.get_current_price(ticker) < b_bands[upper_bound].iloc[-1]):
         holding = True
         buy_price = database.get_current_price(ticker)
-        num_shares = math.ceil(1000 / buy_price)
+        num_shares = math.ceil(max_cost / buy_price)
         buy_time = pd.Timestamp.now()
         print('Bought {0} shares of {1} at {2}'.format(num_shares, ticker, buy_price))
 
@@ -92,7 +94,7 @@ def uptrend(ticker, min_rsi):
     database.update_bars(ticker)
 
     buy_price = database.get_current_price(ticker)
-    num_shares = math.ceil(1000.0 / buy_price)
+    num_shares = math.ceil(max_cost / buy_price)
     buy_time = pd.Timestamp.now()
     print('Bought {0} shares of {1} at {2}'.format(num_shares, ticker, buy_price))
 
@@ -102,27 +104,32 @@ def uptrend(ticker, min_rsi):
     open_price = database.get_bar(ticker, buy_time.floor('D') + pd.Timedelta(9, 'h') + pd.Timedelta(30, 'm'))[0]
     max_risk = abs(open_price - buy_price) * 0.15
 
+    current_price = database.get_current_price(ticker)
+    b_bands = database.bollinger_bands(ticker)
+
     prev_bar_1m_open = database.bars[ticker]['open'].iloc[-1]
     prev_bar_1m_close = database.bars[ticker]['close'].iloc[-1]
     prev_bar_2m_open = database.bars[ticker]['open'].iloc[-2]
     prev_bar_2m_close = database.bars[ticker]['close'].iloc[-2]
 
-    current_price = database.get_current_price(ticker)
-    b_bands = database.bollinger_bands(ticker)
-    max_close = current_price
+    max_close = prev_bar_1m_close
 
     # TODO: adjust entry and closing parameters
     # 1. adjust entry to trigger when within range of closing above lower band, not exactly above
     # 2. change metric for closing to follow trend fully, increase loss % required to close
+    # 3. increase likelihood of exiting trade if about to trend downward
     while ((prev_bar_1m_close > prev_bar_1m_open) or (prev_bar_2m_close > prev_bar_2m_open)) and (max_close - max_risk < current_price) and (current_price < b_bands[bounds['upper']].iloc[-1]):
         database.update_bars(ticker)
+
+        current_price = database.get_current_price(ticker)
+        b_bands = database.bollinger_bands(ticker)
+
         prev_bar_1m_open = database.bars[ticker]['open'].iloc[-1]
         prev_bar_1m_close = database.bars[ticker]['close'].iloc[-1]
         prev_bar_2m_open = database.bars[ticker]['open'].iloc[-2]
         prev_bar_2m_close = database.bars[ticker]['close'].iloc[-2]
-        current_price = database.get_current_price(ticker)
+
         max_close = max(max_close, prev_bar_1m_close)
-        b_bands = database.bollinger_bands(ticker)
 
     sell_time = pd.Timestamp.now()
     print('Sold {0} shares of {1} at {2} for a {3} of {4}'.format(

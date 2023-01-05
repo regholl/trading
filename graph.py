@@ -3,7 +3,7 @@ import plotly.graph_objects as go
 
 from database import Database
 
-stock = 'AAPL'
+stock = 'TSLA'
 
 tickers = [stock]
 ticker = stock
