@@ -102,7 +102,7 @@ def uptrend(ticker, min_rsi):
     # or when max price since uptrend drops below certain threshold
     # threshold is relative to fixed percentage of daily change
     open_price = database.get_bar(ticker, buy_time.floor('D') + pd.Timedelta(9, 'h') + pd.Timedelta(30, 'm'))[0]
-    max_risk = abs(open_price - buy_price) * 0.15
+    max_risk = abs(open_price - buy_price) * 0.25
 
     current_price = database.get_current_price(ticker)
     b_bands = database.bollinger_bands(ticker)
