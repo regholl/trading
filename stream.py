@@ -18,8 +18,8 @@ config = {
 API_KEY = config["TDA_CLIENT_KEY"]
 ACCOUNT_ID = config["TDA_ACCOUNT_ID"]
 TOKEN_PATH = config["TOKEN_PATH"]
-DB_HOST = config["DB_HOST"]
-DB_PORT = config["DB_INSERT_PORT"]
+DB_HOST = config["QUEST_DB_HOST"]
+DB_PORT = config["QUEST_DB_INSERT_PORT"]
 TICKER_PATH = config["TICKER_PATH"]
 
 tickers = []

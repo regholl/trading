@@ -27,11 +27,11 @@ class Database:
         warnings.filterwarnings('ignore')
 
         self.NUM_BARS = num_bars
-        self.DB_HOST = config['DB_HOST']
-        self.DB_INSERT_PORT = config['DB_INSERT_PORT']
-        self.DB_USER = config['DB_USER']
-        self.DB_PASSWORD = config['DB_PASSWORD']
-        self.DB_PORT = config['DB_PORT']
+        self.DB_HOST = config['QUEST_DB_HOST']
+        self.DB_INSERT_PORT = config['QUEST_DB_INSERT_PORT']
+        self.DB_USER = config['QUEST_DB_USER']
+        self.DB_PASSWORD = config['QUEST_DB_PASSWORD']
+        self.DB_PORT = config['QUEST_DB_PORT']
 
         self.connection = pg.connect(
             "user='{0}' password='{1}' host='{2}' port='{3}'".format(
