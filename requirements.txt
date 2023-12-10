@@ -6,3 +6,4 @@ psycopg2_binary==2.9.3
 python-dotenv==0.21.0
 questdb==1.1.0
 tda_api==1.5
+selenium>=4.15.1 # not directly required, pinned by Snyk to avoid a vulnerability
